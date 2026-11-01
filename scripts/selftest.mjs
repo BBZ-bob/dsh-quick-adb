@@ -27,6 +27,16 @@ import { TimingLog } from '../lib/timing.js';
 import { createFakeAdb, loadFixtures } from './mock-device.mjs';
 
 const fixtures = loadFixtures();
+/** 所有创建过的临时目录：即便断言失败/脚本提前退出也统一清理，避免 /tmp 里堆积 */
+const tmpDirs = [];
+process.on('exit', () => {
+    for (const dir of tmpDirs) {
+        try {
+            rmSync(dir, { recursive: true, force: true });
+        }
+        catch { /* 已被显式清理或占用，忽略 */ }
+    }
+});
 const wait = ms => new Promise(done => setTimeout(done, ms));
 
 /** 默认用很小的延迟跑逻辑，只有计时相关场景才用真实量级。 */
@@ -37,6 +47,7 @@ function makeFake(options = {}) {
 function makeEngine({ fake, config = {} } = {}) {
     const f = fake ?? makeFake();
     const tmp = mkdtempSync(join(tmpdir(), 'dsh-qadb-'));
+    tmpDirs.push(tmp);
     const cfg = normalizeConfig({ serial: 'fake-serial-1', screenshotDir: join(tmp, 'shots'), ...config });
     const adb = new Adb({ serial: 'fake-serial-1', exec: f.exec });
     const timing = new TimingLog({ file: join(tmp, 'timing.jsonl'), enabled: true, log: () => {} });

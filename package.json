@@ -25,7 +25,8 @@
     "docs",
     "cordis.patch.yml",
     "README.md",
-    "AUDIT.md"
+    "AUDIT.md",
+    "CHANGELOG.md"
   ],
   "license": "MIT",
   "engines": {

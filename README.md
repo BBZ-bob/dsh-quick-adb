@@ -100,7 +100,9 @@ compressed 自动探测生效了（其余步骤全面转好），但定位点按
 >
 > 本节数据来自使用者部署在云端的 dsh 实例（经 QQ 对话驱动，设备为荣耀平板）。本轮据此修掉了 4 个问题：`adb_batch` 返回值不是 lossless JSON（导致 3/4 次调用直接报错）、dump 彻底失败时 `adb_tap` 不走视觉兜底、失败时换模式重试导致等待翻倍、`adb_app` 默认等待拖慢启动。详见 [AUDIT.md](AUDIT.md) 第 4 节。
 
-> 文档索引：问题与修复记录 [AUDIT.md](AUDIT.md)｜自检方法与可信度 [docs/VERIFICATION.md](docs/VERIFICATION.md)｜支持的环境 [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md)｜为什么能做到 [docs/WHY-IT-WORKS.md](docs/WHY-IT-WORKS.md)
+**当前版本 0.2.8**（tag `v0.2.8`，可用 `dsh plugin add "github:BBZ-bob/dsh-quick-adb#v0.2.8"` 锁定安装）
+
+> 文档索引：**实测汇总 [docs/RESULTS.md](docs/RESULTS.md)**｜变更记录 [CHANGELOG.md](CHANGELOG.md)｜问题与修复 [AUDIT.md](AUDIT.md)｜自检方法与可信度 [docs/VERIFICATION.md](docs/VERIFICATION.md)｜支持的环境 [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md)｜为什么能做到 [docs/WHY-IT-WORKS.md](docs/WHY-IT-WORKS.md)
 
 ---
 
@@ -324,6 +326,8 @@ dsh-quick-adb/
 | `adbPath` | `$DSH_QUICK_ADB_BIN` 或 `$ANDROID_ADB` 或 `adb` | adb 可执行文件 |
 | `serial` | 空（自动选唯一设备） | 目标设备；多设备必填 |
 | `softTtlMs` | `1500` | L1 复用窗口 |
+| `slowDeviceDumpMs` | `1500` | 设备平均 dump 超过该值时，动作自动跳过确认 dump（单 dump 模式） |
+| `deviceCacheFile` | `<dsh-home>/quick-adb/devices.json` | 设备画像（dump 成本/模式）缓存路径；留空则不落盘 |
 | `hardTtlMs` | `15000` | L2 探测复核上限 |
 | `verifyProbe` | `true` | 是否启用 L2 |
 | `dumpMode` | `auto` | `auto`（先 plain，慢才试 compressed）/ `plain` / `compressed` |

@@ -2,7 +2,7 @@
 
 - 审计对象：`dsh-quick-adb@0.2.0`（原 `dsh-android-adb@0.1.0`）
 - 审计时间：2026-11-01
-- 状态：**47 项全部关闭**（45 项修复 + 2 项按设计保留并文档化）
+- 状态：**48 项全部关闭**（46 项修复 + 2 项按设计保留并文档化）
 - 自检方法与可信度：见 [docs/VERIFICATION.md](docs/VERIFICATION.md)
 - 回归入口：`node scripts/selftest.mjs`（95 项；装进 dsh 后 117 项）
 
@@ -102,6 +102,7 @@ node scripts/bench.mjs --real --serial <id>   # 真机 A/B
 | R18 | 低 | `adb_timing` 看不出这台设备是否值得开 confirm | P3e 建议 4 | 表头输出 `设备 dump ≈ Xms` + 建议 | §15 |
 | R19 | 中 | `buildTree` 写的是 `clickables`（复数），引擎读 `tree.clickable`（单数）→ 界面表头永远显示「可点击=0」，而下面却列出 N 个目标 | P3f 现场：`节点=38 可点击=0` 后跟 5 个可点击项 | 字段改名为 `clickable`；表头改用「去重后实际列出的目标数」，与清单严格一致 | §15 |
 | R20 | 低 | 即使改对字段，节点级计数与目标清单仍用两套过滤（节点数含未启用/未去重），两个数字可能仍不一致 | 复测反馈：建议统一口径 | 节点级计数改名 `clickableNodes`，只用于诊断；所有对外展示统一为 `目标=N`（等于清单条数） | §1、§15 |
+| R21 | 低 | 自测失败路径不清理临时目录，累计在 `/tmp` 留下 929 个 `dsh-qadb-*` | 本地清理时发现 | 注册 `process.on('exit')` 统一回收所有 mkdtemp 目录 | 手工验证：连跑两次 0 残留 |
 
 ### 对「用 `exec-out uiautomator dump /dev/tty`」建议的回应
 
