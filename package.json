@@ -1,0 +1,72 @@
+{
+  "name": "dsh-quick-adb",
+  "version": "0.2.0",
+  "description": "给 dsh 加 Android 设备直控能力：用 uiautomator 控件树替代整屏截图识图，分层缓存界面、把高频动作封装成 adb_* 工具、并把多步指令合并成一次 ADB 往返。Android device control for DeepSeek Harness over ADB.",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "android",
+    "adb",
+    "uiautomator",
+    "automation",
+    "agent-tools"
+  ],
+  "private": false,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "scripts",
+    "fixtures",
+    "docs",
+    "cordis.patch.yml",
+    "README.md",
+    "AUDIT.md"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.1.5-rc.1 <0.1.6-0 || >=0.1.6-alpha.1 <0.1.7-0 || >=0.1.7-alpha.1 <0.2.0-0 || >=0.2.0-rc.1 <0.3.0-0 || >=0.2.1-0 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dshx": {
+    "contributes": {
+      "tools": [
+        "adb_screen",
+        "adb_tap",
+        "adb_swipe",
+        "adb_input",
+        "adb_key",
+        "adb_wait",
+        "adb_batch",
+        "adb_app",
+        "adb_shell",
+        "adb_timing"
+      ],
+      "skills": []
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-tools": ">=0.1.5-rc.1 <0.1.6-0 || >=0.1.6-alpha.1 <0.1.7-0 || >=0.1.7-alpha.1 <0.2.0-0 || >=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-system-prompt": ">=0.1.5-rc.1 <0.1.6-0 || >=0.1.6-alpha.1 <0.1.7-0 || >=0.1.7-alpha.1 <0.2.0-0 || >=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/schemastery": ">=0.1.5-rc.1 <0.1.6-0 || >=0.1.6-alpha.1 <0.1.7-0 || >=0.1.7-alpha.1 <0.2.0-0 || >=0.2.0-rc.1 <0.3.0-0"
+  },
+  "dependencies": {
+    "schemastery": "^3.18.0"
+  },
+  "scripts": {
+    "selftest": "node scripts/selftest.mjs",
+    "bench": "node scripts/bench.mjs",
+    "bench:report": "node scripts/bench.mjs --report",
+    "probe": "node scripts/bench.mjs --report"
+  }
+}

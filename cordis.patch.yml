@@ -1,0 +1,13 @@
+# dsh-quick-adb —— dsh 插件清单（bundle patch）
+#
+# 由 package.json 的 `dsh.bundle.patch = "./cordis.patch.yml"` 声明，
+# 宿主在装配 profile 时读取本文件并把下面的条目 insert 进 Loader 树。
+#
+# 形态要求：顶层必须是 YAML 数组（与 dsh 其他 bundle patch 一致）。
+# `name` 用裸包名，插件被 pnpm 装进 profile 的 node_modules 后由运行时解析；
+# 手工部署（不装包）时改用绝对路径挂到 profile 层 patch，见 README「方式 B」。
+- insert:
+  - id: dsh-quick-adb
+    name: 'dsh-quick-adb'
+    # 所有配置项都可在 profile 的 cordis.patch.yml 里按同 id 覆盖，例如：
+    # config: { serial: '192.168.1.20:5555', settleFastMs: 200, inputMode: adbkeyboard-b64 }
