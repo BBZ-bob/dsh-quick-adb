@@ -88,7 +88,7 @@ if (args.report) {
         console.log(`\n数据源：${timingFile}（${entries.length} 条）`);
     }
     else {
-        console.log(`没有找到计时日志：${timingFile}（先在 dsh 里跑几步 android_* 工具）`);
+        console.log(`没有找到计时日志：${timingFile}（先在 dsh 里跑几步 adb_* 工具）`);
     }
     process.exit(0);
 }
