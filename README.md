@@ -51,7 +51,13 @@
 
 compressed 自动探测生效了（其余步骤全面转好），但定位点按没变：`adb_tap(selector)` 在这台设备上做**两遍 dump**（定位 2.7s + 确认 2.7s）。探针数据：`settle=none` 只要 2655/2991ms。
 
-**0.2.4 起：插件测量本机 dump 成本，超过 `slowDeviceDumpMs`（默认 1500ms）自动进入「单 dump 模式」**——动作只做定位 dump，不再做事后确认，返回里注明「需要看界面时再调 adb_screen」。显式传 `settle` 仍然优先。按探针数据，定位点按应回落到 ~2.7s，整轮合计应低于基线（待实测）。快 dump 设备行为不变。
+**0.2.4/0.2.5 起：两件事分开处理。**
+
+- 插件测量本机 dump 成本，超过 `slowDeviceDumpMs`（默认 1500ms）自动进入「单 dump 模式」：动作只做定位 dump，不做事后确认，返回里注明「需要看界面时再调 adb_screen」。
+- **`settle` 只控制等待，`confirm` 控制是否重新解析**（0.2.5 拆分）。P3d 现场脚本显式传 `settle:'fast'` 曾被迫多做一遍确认 dump；现在显式 settle 不再隐含确认。`confirm:false` = 只等待不解析，`confirm:true` = 强制确认，默认按本机 dump 成本自动。
+- **代价要心里有数：慢 dump 设备上，每次确认约多花 2.5–2.7s**（本机实测 dump 2.4–2.8s）。
+
+按探针数据（settle=none 2848/2842ms），定位点按应回落到 ~2.85s，整轮约 6.9s，比裸 adb 快 ~25%。快 dump 设备行为不变。
 
 ### P3b：为什么「定位点按」反而变慢（0.2.3 已修）
 
@@ -175,7 +181,7 @@ adb devices -l                      # 必须看到状态 device
 ### 验证
 
 ```bash
-node scripts/selftest.mjs    # 87 项断言（装进 dsh 后另跑 21 项工具层断言，共 108）
+node scripts/selftest.mjs    # 89 项断言（装进 dsh 后另跑 21 项工具层断言，共 110）
 node scripts/bench.mjs       # 优化前后单步耗时对比
 ```
 
@@ -306,7 +312,7 @@ dsh-quick-adb/
 | `dumpTimeoutMs` | `5000` | 单次 dump 超时 |
 | `actionTimeoutMs` | `20000` | 动作脚本（含 sleep+dump）超时 |
 | `waitTimeoutMs` | `10000` | `adb_wait` 默认超时 |
-| `settleFastMs` / `settleMediumMs` / `settleSlowMs` | `250` / `700` / `1500` | 动作后到重新解析之间的等待 |
+| `settleFastMs` / `settleMediumMs` / `settleSlowMs` | `250` / `700` / `1500` | 动作后的等待时长（只睡不解析；是否解析由 confirm 决定） |
 | `appSettle` | `none` | `adb_app` 默认等待；`none` 只启动不取界面（实测启动慢 61% 的主因） |
 | `keyDelayMs` | `80` | 连按按键间隔（原 200ms 让「返回两次」多花约 140ms） |
 | `inputFocusDelayMs` | `80` | 点击输入框后到开始输入的等待 |
@@ -388,7 +394,7 @@ node scripts/bench.mjs --real --serial 192.168.1.20:5555 --x 540 --y 1200 --step
 ## 11. 测试
 
 ```bash
-node scripts/selftest.mjs     # 87 项（无 dsh 依赖）；装进 dsh 后多跑 21 项工具层断言，共 108 项
+node scripts/selftest.mjs     # 89 项（无 dsh 依赖）；装进 dsh 后多跑 21 项工具层断言，共 110 项
 node scripts/bench.mjs        # 单步耗时对比（mock 或 --real）
 ```
 

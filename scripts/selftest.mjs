@@ -374,8 +374,18 @@ console.log('\n=== 12d. 单 dump 模式（P3c：慢 dump 设备不做确认 dump
     check('动作默认跳过确认 dump（0 次新 dump）', after === before, `dump ${before} → ${after}`);
     check('标记 autoSettle=single-dump', result.autoSettle === 'single-dump');
     check('返回 note 提示下一步感知', result.note.includes('跳过点击后确认'));
+    // P3d 现场脚本传的就是 settle:'fast'——现在它只控制等待，不再强制确认 dump
     const forced = await slow.engine.tap({ x: 540, y: 1200, settle: 'fast' });
-    check('显式 settle 仍被尊重', forced.settle === 'dumped', forced.settle);
+    check('显式 settle 只控制等待（慢设备不做确认）', forced.settle === 'none' && forced.autoSettle === 'single-dump', forced.settle);
+    const confirmed = await slow.engine.tap({ x: 540, y: 1200, settle: 'fast', confirm: true });
+    check('显式 confirm:true 仍强制确认', confirmed.settle === 'dumped', confirmed.settle);
+
+    // 复刻现场探针：慢设备 + settle=fast + selector = 只有一次定位 dump
+    const probe = makeEngine({ fake: makeFake({ dumpMs: 1800 }) });
+    const probeResult = await probe.engine.tap({ selector: { text: '搜索' }, settle: 'fast' });
+    const dumpCount = probe.fake.state.scripts.filter(x => x.includes('uiautomator dump')).length;
+    check('慢设备定位点击只做一次 dump（P3d 探针对齐）', probeResult.ok === true && dumpCount === 1, `dump=${dumpCount}`);
+    rmSync(probe.tmp, { recursive: true, force: true });
     rmSync(slow.tmp, { recursive: true, force: true });
 
     const fast = makeEngine({ fake: makeFake({ dumpMs: 80 }) });
