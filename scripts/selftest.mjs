@@ -363,17 +363,34 @@ console.log('\n=== 12c. 批量降级：命令超时不再打断脚本 ===');
     rmSync(broken.tmp, { recursive: true, force: true });
 }
 
+console.log('\n=== 12d. 单 dump 模式（P3c：慢 dump 设备不做确认 dump） ===');
+{
+    const slow = makeEngine({ fake: makeFake({ dumpMs: 1800 }) });
+    await slow.engine.screen();
+    check('慢 dump 设备被识别', slow.engine.perception.slowDumpDevice() === true, `cost=${slow.engine.perception.dumpCostMs}ms`);
+    const before = slow.fake.state.scripts.filter(x => x.includes('uiautomator dump')).length;
+    const result = await slow.engine.tap({ selector: { text: '搜索' } });
+    const after = slow.fake.state.scripts.filter(x => x.includes('uiautomator dump')).length;
+    check('动作默认跳过确认 dump（0 次新 dump）', after === before, `dump ${before} → ${after}`);
+    check('标记 autoSettle=single-dump', result.autoSettle === 'single-dump');
+    check('返回 note 提示下一步感知', result.note.includes('跳过点击后确认'));
+    const forced = await slow.engine.tap({ x: 540, y: 1200, settle: 'fast' });
+    check('显式 settle 仍被尊重', forced.settle === 'dumped', forced.settle);
+    rmSync(slow.tmp, { recursive: true, force: true });
+
+    const fast = makeEngine({ fake: makeFake({ dumpMs: 80 }) });
+    await fast.engine.screen();
+    const fastResult = await fast.engine.tap({ selector: { text: '搜索' } });
+    check('快设备不受影响，仍做事后确认', fastResult.settle === 'dumped' && fastResult.autoSettle === undefined, fastResult.settle);
+    rmSync(fast.tmp, { recursive: true, force: true });
+}
+
 console.log('\n=== 13. 视觉兜底：截图与外部命令 ===');
 {
     const shotOnly = makeEngine({ fake: makeFake({ startScreen: 'webview' }) });
-    let message = '';
-    try {
-        await shotOnly.engine.tap({ selector: { text: '确定' } });
-    }
-    catch (error) {
-        message = error.message;
-    }
-    check('未配 visionCommand 时落盘截图并报错', message.includes('已截图兜底'), message.slice(0, 50));
+    const failed = await shotOnly.engine.tap({ selector: { text: '确定' } });
+    check('未配 visionCommand 时定位失败返回 ok:false（不抛错）', failed.ok === false && failed.error.includes('已截图兜底'), (failed.error ?? '').slice(0, 60));
+    check('失败信息保留可操作性', failed.note.includes('未执行点击'));
     check('视觉兜底被计数', shotOnly.cache.snapshot().stats.vision === 1);
 
     const script = join(shotOnly.tmp, 'vision.mjs');

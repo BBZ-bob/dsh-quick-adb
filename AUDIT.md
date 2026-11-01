@@ -2,9 +2,9 @@
 
 - 审计对象：`dsh-quick-adb@0.2.0`（原 `dsh-android-adb@0.1.0`）
 - 审计时间：2026-11-01
-- 状态：**39 项全部关闭**（37 项修复 + 2 项按设计保留并文档化）
+- 状态：**41 项全部关闭**（39 项修复 + 2 项按设计保留并文档化）
 - 自检方法与可信度：见 [docs/VERIFICATION.md](docs/VERIFICATION.md)
-- 回归入口：`node scripts/selftest.mjs`（80 项；装进 dsh 后 101 项）
+- 回归入口：`node scripts/selftest.mjs`（87 项；装进 dsh 后 108 项）
 
 > **口径更正**：上一版汇总写「P2 × 10、P3 × 8」，与实际条目数（各 11 条）不符，本版按实际条目计。
 
@@ -66,7 +66,7 @@
 ## 4. 复现方式
 
 ```bash
-node scripts/selftest.mjs                     # 80 项，无需真机与 dsh
+node scripts/selftest.mjs                     # 87 项，无需真机与 dsh
 DSH_ADB_SELFTEST_VERBOSE=1 node scripts/selftest.mjs   # 额外打印计时表
 node scripts/bench.mjs --steps 5              # 单步耗时对比
 node scripts/bench.mjs --real --serial <id>   # 真机 A/B
@@ -94,6 +94,8 @@ node scripts/bench.mjs --real --serial <id>   # 真机 A/B
 | R10 | 中 | `dumpTimeoutMs=8000` 让一次失败等太久 | P3b 9.4 | 默认 5000；试 compressed 时 3000 | §12 |
 | R11 | 中 | `softTtlMs=800` 让动作返回的树很快过期 | P3b 建议 5 | 默认 1500 | §3 |
 | R12 | 低 | 纯动作仍要付感知的钱 | P3b 建议 4 | 新增 `perceive:false`（等价 settle=none） | §15 |
+| R13 | **严重（性能）** | `adb_tap(selector)` 默认做两遍 dump（定位 + 确认），慢 dump 设备上动作耗时翻倍 | P3c：0.2.3 定位点按 5771ms，`settle=none` 实测 2655/2991ms | 测量本机 dump 成本，超过 `slowDeviceDumpMs`（1500ms）自动单 dump 模式；显式 settle 优先 | §12d |
+| R14 | 中 | 动作定位彻底失败时抛错，可能打断调用方脚本 | P3b 9.4 延伸 | `adb_tap` 返回 `ok:false` + 原因，不再抛出 | §13 |
 
 ### 对「用 `exec-out uiautomator dump /dev/tty`」建议的回应
 
