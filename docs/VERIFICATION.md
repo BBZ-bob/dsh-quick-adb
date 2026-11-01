@@ -2,7 +2,7 @@
 
 - 对象：`dsh-quick-adb@0.2.0`（TypeScript 无关，纯 ESM；lib 约 3.1k 行 / scripts 约 0.7k 行）
 - 时间：2026-11-01
-- 结论摘要：**34 项已知问题全部关闭**（32 修复 / 2 按设计保留）；自测 73 项（含 dsh 环境 94 项）全绿。性能结论已按第三方真机复测修正：**只在需要感知的流程里成立，固定坐标流水线是负优化**。
+- 结论摘要：**39 项已知问题全部关闭**（37 修复 / 2 按设计保留）；自测 80 项（含 dsh 环境 101 项）全绿。性能结论已按第三方真机复测修正：**只在需要感知的流程里成立，固定坐标流水线是负优化**。
 - 本文件回答四件事：**怎么查的、查了什么、逐项结论、这个结论有多可信**。
 
 ---
@@ -165,7 +165,7 @@
 ## 7. 如何自行复核
 
 ```bash
-node scripts/selftest.mjs                               # 71 项断言
+node scripts/selftest.mjs                               # 80 项断言
 DSH_ADB_SELFTEST_VERBOSE=1 node scripts/selftest.mjs     # 附计时报告
 node scripts/bench.mjs --steps 5                        # 结构性 A/B
 node scripts/bench.mjs --real --serial <ip:5555> \

@@ -1,6 +1,6 @@
 {
   "name": "dsh-quick-adb",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "给 dsh 加 Android 设备直控能力：用 uiautomator 控件树替代整屏截图识图，分层缓存界面、把高频动作封装成 adb_* 工具、并把多步指令合并成一次 ADB 往返。Android device control for DeepSeek Harness over ADB.",
   "keywords": [
     "dsh",

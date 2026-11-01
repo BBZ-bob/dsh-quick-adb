@@ -2,9 +2,9 @@
 
 - 审计对象：`dsh-quick-adb@0.2.0`（原 `dsh-android-adb@0.1.0`）
 - 审计时间：2026-11-01
-- 状态：**34 项全部关闭**（32 项修复 + 2 项按设计保留并文档化）
+- 状态：**39 项全部关闭**（37 项修复 + 2 项按设计保留并文档化）
 - 自检方法与可信度：见 [docs/VERIFICATION.md](docs/VERIFICATION.md)
-- 回归入口：`node scripts/selftest.mjs`（73 项；装进 dsh 后 94 项）
+- 回归入口：`node scripts/selftest.mjs`（80 项；装进 dsh 后 101 项）
 
 > **口径更正**：上一版汇总写「P2 × 10、P3 × 8」，与实际条目数（各 11 条）不符，本版按实际条目计。
 
@@ -66,7 +66,7 @@
 ## 4. 复现方式
 
 ```bash
-node scripts/selftest.mjs                     # 73 项，无需真机与 dsh
+node scripts/selftest.mjs                     # 80 项，无需真机与 dsh
 DSH_ADB_SELFTEST_VERBOSE=1 node scripts/selftest.mjs   # 额外打印计时表
 node scripts/bench.mjs --steps 5              # 单步耗时对比
 node scripts/bench.mjs --real --serial <id>   # 真机 A/B
@@ -89,6 +89,11 @@ node scripts/bench.mjs --real --serial <id>   # 真机 A/B
 | R5 | 中 | 连按按键间隔固定 200ms，返回两次多花 ~140ms | 报告 7.4（328→468ms） | 新增 `keyDelayMs`，默认 80ms | §15 |
 | R6 | 低 | `adb_screen` 在不可解析界面直接抛错，模型拿不到任何可用信息 | 报告第 2 条建议 | 改为返回 `source=vision` + 截图路径 + 原因 | §12 |
 | R7 | 低 | 批量末尾已有 `{dump:true}` 时，收尾的 `verify` 又补一次 dump，白付一次往返 | 0.2.1 现场复测：`swipe/swipe/dump` = 2 次往返 6434ms | 记录 `dirty`，收尾只在「上次 dump 后仍动过界面」时才 dump | §7 |
+| R8 | **严重（性能陷阱）** | 默认开 `--compressed`，而部分设备 compressed 比 plain 慢 4–5 倍（11.5s vs 2.3–3.7s） | P3b 9.3，定位点按 3418→5345ms | 默认改 plain；新增 `dumpMode`；auto 下 plain 偏慢才试一次 compressed（3s 上限），试完定死 | §12b |
+| R9 | **严重（脚本中断）** | dump 超时抛 ActionError，打断整条流水线 | P3b 9.4（现场崩两次） | 批量 flush 捕获异常标 `degraded` 继续；`adb_wait` 超时改为返回 `ok:false`；`adb_screen` 返回截图兜底 | §12c、§11 |
+| R10 | 中 | `dumpTimeoutMs=8000` 让一次失败等太久 | P3b 9.4 | 默认 5000；试 compressed 时 3000 | §12 |
+| R11 | 中 | `softTtlMs=800` 让动作返回的树很快过期 | P3b 建议 5 | 默认 1500 | §3 |
+| R12 | 低 | 纯动作仍要付感知的钱 | P3b 建议 4 | 新增 `perceive:false`（等价 settle=none） | §15 |
 
 ### 对「用 `exec-out uiautomator dump /dev/tty`」建议的回应
 

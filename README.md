@@ -38,6 +38,23 @@
 
 **结论：插件值钱的地方是「按文案定位 + 每步看界面再决定下一步」。录制好的死坐标流水线请直接用 `adb_shell` 或一条 `adb_batch`（合并成一次往返），不要逐步调工具。**
 
+### P3b：为什么「定位点按」反而变慢（0.2.3 已修）
+
+第三次复测（稳定界面 + 必须定位的步骤，3 轮均值）：
+
+| 步骤 | 基线 | 插件 0.2.0 | 说明 |
+|---|---:|---:|---|
+| 定位并点「设置」 | 3418 ms | 5345 ms | **compressed 拖累** |
+| 返回 | 602 ms | 361 ms | 缓存/少往返 |
+| 读界面 | 3367 ms | 2558 ms | 少 2 次往返 |
+| 合计 | 9232 ms | 10283 ms | +11%，但 ADB 调用 11 → 7 |
+
+根因：该设备的 `uiautomator dump --compressed` 要 **11.5s**（直接超时），普通 dump 只要 **2.3–3.7s**。而 0.2.0 默认开 compressed。
+
+0.2.3 起：**默认 plain**，`dumpMode` 可配；`auto` 下只有 plain 平均超过 `slowDumpMs`（默认 4s）才试一次 compressed（超时上限 3s），试完定死不再反复。按上述数据，定位点按应回落到 ~2.9s，整轮约 7.8s —— 比基线快约 15%（这一项是推算，等实测确认）。
+
+同时修掉两个会导致**脚本中断**的问题：dump 超时不再抛错（批量降级执行、`adb_wait` 返回 `ok:false`）、`perceive:false` 提供纯动作快速通道。
+
 > **0.2.2 补记**：现场复测 `swipe → swipe → dump` 三步是 2 次往返 6434ms，其中第二次是收尾重复 dump（末尾已有 `{dump:true}`，`verify` 又补了一次）。0.2.2 起收尾只在「上次 dump 后仍动过界面」时才补，同一流程变为 **1 次往返**（该链路上约省 3.2s）。因此批量里**不需要**在末尾再写 `{dump:true}`。
 >
 > 感谢 @大帅鱼 的独立复测。本轮据此修掉了 4 个问题：`adb_batch` 返回值不是 lossless JSON（导致 3/4 次调用直接报错）、dump 彻底失败时 `adb_tap` 不走视觉兜底、失败时换模式重试导致等待翻倍、`adb_app` 默认等待拖慢启动。详见 [AUDIT.md](AUDIT.md) 第 4 节。
@@ -143,7 +160,7 @@ adb devices -l                      # 必须看到状态 device
 ### 验证
 
 ```bash
-node scripts/selftest.mjs    # 73 项断言（装进 dsh 后另跑 21 项工具层断言，共 94）
+node scripts/selftest.mjs    # 80 项断言（装进 dsh 后另跑 21 项工具层断言，共 101）
 node scripts/bench.mjs       # 优化前后单步耗时对比
 ```
 
@@ -265,10 +282,13 @@ dsh-quick-adb/
 |---|---|---|
 | `adbPath` | `$DSH_QUICK_ADB_BIN` 或 `$ANDROID_ADB` 或 `adb` | adb 可执行文件 |
 | `serial` | 空（自动选唯一设备） | 目标设备；多设备必填 |
-| `softTtlMs` | `800` | L1 复用窗口 |
+| `softTtlMs` | `1500` | L1 复用窗口 |
 | `hardTtlMs` | `15000` | L2 探测复核上限 |
 | `verifyProbe` | `true` | 是否启用 L2 |
-| `dumpTimeoutMs` | `8000` | 单次 dump 超时 |
+| `dumpMode` | `auto` | `auto`（先 plain，慢才试 compressed）/ `plain` / `compressed` |
+| `slowDumpMs` | `4000` | auto 下 plain 平均超过该值才试 compressed |
+| `trialDumpTimeoutMs` | `3000` | 试 compressed 的超时上限，避免一次试错等太久 |
+| `dumpTimeoutMs` | `5000` | 单次 dump 超时 |
 | `actionTimeoutMs` | `20000` | 动作脚本（含 sleep+dump）超时 |
 | `waitTimeoutMs` | `10000` | `adb_wait` 默认超时 |
 | `settleFastMs` / `settleMediumMs` / `settleSlowMs` | `250` / `700` / `1500` | 动作后到重新解析之间的等待 |
@@ -353,7 +373,7 @@ node scripts/bench.mjs --real --serial 192.168.1.20:5555 --x 540 --y 1200 --step
 ## 11. 测试
 
 ```bash
-node scripts/selftest.mjs     # 73 项（无 dsh 依赖）；装进 dsh 后多跑 21 项工具层断言，共 94 项
+node scripts/selftest.mjs     # 80 项（无 dsh 依赖）；装进 dsh 后多跑 21 项工具层断言，共 101 项
 node scripts/bench.mjs        # 单步耗时对比（mock 或 --real）
 ```
 

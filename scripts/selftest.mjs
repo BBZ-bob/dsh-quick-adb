@@ -271,15 +271,10 @@ console.log('\n=== 11. 等待：命中与超时上界 ===');
 
     const slow = makeEngine({ fake: makeFake({ dumpMs: 200 }) });
     const started = Date.now();
-    let timeoutMessage = '';
-    try {
-        await slow.engine.wait({ selector: { text: '永不出现' }, timeoutMs: 300 });
-    }
-    catch (error) {
-        timeoutMessage = error.message;
-    }
+    const timedOut = await slow.engine.wait({ selector: { text: '永不出现' }, timeoutMs: 300 });
     const elapsed = Date.now() - started;
-    check('超时抛错并附最后界面', timeoutMessage.includes('等待超时'), timeoutMessage.slice(0, 30));
+    check('超时返回结构化失败而不是抛错（不打断脚本）', timedOut.ok === false && timedOut.timedOut === true, timedOut.note);
+    check('失败结果仍带最后界面', typeof timedOut.text === 'string' && timedOut.text.includes('最后界面'));
     check('超时上界受控（< 超时 + 一个 dump）', elapsed < 900, `elapsed=${elapsed}ms`);
     rmSync(slow.tmp, { recursive: true, force: true });
 }
@@ -298,7 +293,7 @@ console.log('\n=== 12. dump 降级链与快速失败 ===');
     const timedOut = await timeout.engine.screen();
     check('超时后立刻转视觉而不是重试第二次', timedOut.source === 'vision');
     check('只尝试了一次 dump', timeout.fake.state.calls - before <= 3, `calls=${timeout.fake.state.calls - before}`);
-    check('超时不会永久关闭压缩（P2-3）', timeout.engine.caps.compressed === true);
+    check('超时不会把模式钉死在 compressed（P2-3）', timeout.engine.perception.currentCompressed() === false);
     check('失败被记入不可解析名单', timeout.engine.perception.dumpFailure !== null);
     rmSync(timeout.tmp, { recursive: true, force: true });
 
@@ -332,6 +327,40 @@ console.log('\n=== 12. dump 降级链与快速失败 ===');
     const retried = await switched.engine.screen({ invalidate: true });
     check('换界面后重新尝试 dump', retried.source === 'dump', retried.source);
     rmSync(switched.tmp, { recursive: true, force: true });
+}
+
+console.log('\n=== 12b. dump 模式选择（P3b：compressed 在部分设备上更慢） ===');
+{
+    const plain = makeEngine();
+    await plain.engine.screen();
+    const scripts = plain.fake.state.scripts.filter(x => x.includes('uiautomator dump'));
+    check('默认走 plain，不带 --compressed', scripts.length > 0 && scripts.every(x => !x.includes('--compressed')), scripts[0]?.slice(0, 60));
+    rmSync(plain.tmp, { recursive: true, force: true });
+
+    // plain 慢于 slowDumpMs → 自动试一次 compressed
+    const auto = makeEngine({ config: { dumpMode: 'auto', slowDumpMs: 60 } });
+    await auto.engine.screen();
+    await auto.engine.screen({ invalidate: true });
+    await auto.engine.screen({ invalidate: true });
+    const tried = auto.fake.state.scripts.some(x => x.includes('uiautomator dump') && x.includes('--compressed'));
+    check('plain 持续偏慢时会试一次 compressed', tried);
+    rmSync(auto.tmp, { recursive: true, force: true });
+
+    // 显式指定 compressed 时仍然尊重用户
+    const forced = makeEngine({ config: { dumpMode: 'compressed' } });
+    await forced.engine.screen();
+    check('dumpMode=compressed 时确实带参数', forced.fake.state.scripts.some(x => x.includes('--compressed')));
+    rmSync(forced.tmp, { recursive: true, force: true });
+}
+
+console.log('\n=== 12c. 批量降级：命令超时不再打断脚本 ===');
+{
+    const broken = makeEngine({ fake: makeFake({ faults: { dumpErrors: 1 } }) });
+    const result = await broken.engine.batch({ steps: [{ tap: [540, 1200] }, { dump: true }, { tap: [540, 1300] }] });
+    check('批量没有抛错，返回结构化结果', result !== null && typeof result.ok === 'boolean', String(result?.ok));
+    check('标记为降级执行', result.degraded === true);
+    check('后续坐标步骤仍然执行', result.steps.filter(step => step.kind === 'tap' && step.ok).length === 2, JSON.stringify(result.steps.map(step => step.ok)));
+    rmSync(broken.tmp, { recursive: true, force: true });
 }
 
 console.log('\n=== 13. 视觉兜底：截图与外部命令 ===');
