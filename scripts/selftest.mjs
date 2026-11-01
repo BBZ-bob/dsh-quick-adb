@@ -188,6 +188,12 @@ console.log('\n=== 7. 批量指令合并往返 ===');
     check('结尾验证拿到界面', result.screen?.pkg === 'com.tencent.mm');
     check('步骤结果完整', result.steps.length === 3 && result.steps.every(step => step.ok), JSON.stringify(result.steps.map(s => s.kind)));
     record('批处理 3 步', 3, adb.calls - before, 0);
+
+    // 末尾显式 dump + verify:true 曾经会再补一次 dump（现场：swipe/swipe/dump = 2 次往返）
+    const tail = await engine.batch({ steps: [{ swipe: 'up' }, { swipe: 'down' }, { dump: true }] });
+    check('末尾已 dump 时收尾不再重复（省 1 次往返）', tail.adbCalls === 1, `calls=${tail.adbCalls}`);
+    check('省略收尾后仍返回界面', tail.screen !== null && tail.screen.pkg === 'com.tencent.mm');
+    record('swipe+swipe+dump', 3, tail.adbCalls, 0);
     rmSync(tmp, { recursive: true, force: true });
 }
 

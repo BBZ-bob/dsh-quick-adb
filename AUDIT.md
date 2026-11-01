@@ -2,9 +2,9 @@
 
 - 审计对象：`dsh-quick-adb@0.2.0`（原 `dsh-android-adb@0.1.0`）
 - 审计时间：2026-11-01
-- 状态：**33 项全部关闭**（31 项修复 + 2 项按设计保留并文档化）
+- 状态：**34 项全部关闭**（32 项修复 + 2 项按设计保留并文档化）
 - 自检方法与可信度：见 [docs/VERIFICATION.md](docs/VERIFICATION.md)
-- 回归入口：`node scripts/selftest.mjs`（71 项；装进 dsh 后 92 项）
+- 回归入口：`node scripts/selftest.mjs`（73 项；装进 dsh 后 94 项）
 
 > **口径更正**：上一版汇总写「P2 × 10、P3 × 8」，与实际条目数（各 11 条）不符，本版按实际条目计。
 
@@ -66,7 +66,7 @@
 ## 4. 复现方式
 
 ```bash
-node scripts/selftest.mjs                     # 71 项，无需真机与 dsh
+node scripts/selftest.mjs                     # 73 项，无需真机与 dsh
 DSH_ADB_SELFTEST_VERBOSE=1 node scripts/selftest.mjs   # 额外打印计时表
 node scripts/bench.mjs --steps 5              # 单步耗时对比
 node scripts/bench.mjs --real --serial <id>   # 真机 A/B
@@ -88,6 +88,7 @@ node scripts/bench.mjs --real --serial <id>   # 真机 A/B
 | R4 | 中 | `adb_app` 默认 `settle=medium`，启动比裸 adb 慢 61%（656→1054ms） | 报告 7.4 | 新增 `appSettle`，默认 `none`：启动就是启动，需要界面再传 settle | §15 |
 | R5 | 中 | 连按按键间隔固定 200ms，返回两次多花 ~140ms | 报告 7.4（328→468ms） | 新增 `keyDelayMs`，默认 80ms | §15 |
 | R6 | 低 | `adb_screen` 在不可解析界面直接抛错，模型拿不到任何可用信息 | 报告第 2 条建议 | 改为返回 `source=vision` + 截图路径 + 原因 | §12 |
+| R7 | 低 | 批量末尾已有 `{dump:true}` 时，收尾的 `verify` 又补一次 dump，白付一次往返 | 0.2.1 现场复测：`swipe/swipe/dump` = 2 次往返 6434ms | 记录 `dirty`，收尾只在「上次 dump 后仍动过界面」时才 dump | §7 |
 
 ### 对「用 `exec-out uiautomator dump /dev/tty`」建议的回应
 

@@ -38,6 +38,8 @@
 
 **结论：插件值钱的地方是「按文案定位 + 每步看界面再决定下一步」。录制好的死坐标流水线请直接用 `adb_shell` 或一条 `adb_batch`（合并成一次往返），不要逐步调工具。**
 
+> **0.2.2 补记**：现场复测 `swipe → swipe → dump` 三步是 2 次往返 6434ms，其中第二次是收尾重复 dump（末尾已有 `{dump:true}`，`verify` 又补了一次）。0.2.2 起收尾只在「上次 dump 后仍动过界面」时才补，同一流程变为 **1 次往返**（该链路上约省 3.2s）。因此批量里**不需要**在末尾再写 `{dump:true}`。
+>
 > 感谢 @大帅鱼 的独立复测。本轮据此修掉了 4 个问题：`adb_batch` 返回值不是 lossless JSON（导致 3/4 次调用直接报错）、dump 彻底失败时 `adb_tap` 不走视觉兜底、失败时换模式重试导致等待翻倍、`adb_app` 默认等待拖慢启动。详见 [AUDIT.md](AUDIT.md) 第 4 节。
 
 > 文档索引：问题与修复记录 [AUDIT.md](AUDIT.md)｜自检方法与可信度 [docs/VERIFICATION.md](docs/VERIFICATION.md)｜支持的环境 [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md)｜为什么能做到 [docs/WHY-IT-WORKS.md](docs/WHY-IT-WORKS.md)
@@ -141,7 +143,7 @@ adb devices -l                      # 必须看到状态 device
 ### 验证
 
 ```bash
-node scripts/selftest.mjs    # 71 项断言（装进 dsh 后另跑 21 项工具层断言，共 92）
+node scripts/selftest.mjs    # 73 项断言（装进 dsh 后另跑 21 项工具层断言，共 94）
 node scripts/bench.mjs       # 优化前后单步耗时对比
 ```
 
@@ -351,7 +353,7 @@ node scripts/bench.mjs --real --serial 192.168.1.20:5555 --x 540 --y 1200 --step
 ## 11. 测试
 
 ```bash
-node scripts/selftest.mjs     # 71 项（无 dsh 依赖）；装进 dsh 后多跑 21 项工具层断言，共 92 项
+node scripts/selftest.mjs     # 73 项（无 dsh 依赖）；装进 dsh 后多跑 21 项工具层断言，共 94 项
 node scripts/bench.mjs        # 单步耗时对比（mock 或 --real）
 ```
 
