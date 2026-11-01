@@ -13,6 +13,33 @@
 
 单步加速 **≈5.1×**（多次运行 5.05–5.10；表内为单次示例，数值随调度略有波动）。自测（`node scripts/selftest.mjs`）里，9 个真实场景综合下来是 **0.38 次往返/步**，对照实测的「朴素三步式」是 **3 次/步**。
 
+## 0. 真实链路实测（第三方，2026-11-01）
+
+上面的数字来自 mock 设备（dump 520ms）。真实链路上 dump 本身就要 2.4–2.5s，所以**单步是 3 秒量级，不是 0.8 秒**。下面是独立复测（阿里云 Debian + 荣耀平板 Android 16 + easytier 组网，RTT 125ms）的关键结论：
+
+### 按「动作 + 取回界面」对齐（这才是插件的真实使用形态）
+
+| 场景 | 裸 adb | 插件 | 往返 |
+|---|---:|---:|---|
+| 点一下并拿到新界面 | 3206 ms | **3040 ms** | 4 → 2 |
+| 滑一下并拿到新界面 | 3433 ms | **3142 ms** | 4 → 2 |
+| 冷缓存读界面 | 3013 ms | **2431 ms** | 3 → 1 |
+| 连续操作中读界面 | 3013 ms | **≈ 0 ms** | 3 → 0 |
+| 启动并看到界面 | 3442 ms | 3640 ms | 持平 |
+
+### 固定坐标流水线（10 个动作，3 轮）
+
+| 路径 | 动作合计 |
+|---|---:|
+| 裸 adb 脚本 | 3729 ms |
+| 插件逐步调用 | **4911 ms（慢 32%）** |
+
+原因不是感知慢，而是**这条流程根本不需要感知**：每一步多一层 Node 封装、各自拉起一个 adb 进程，而省下的往返没人用。整轮墙钟 37.3s 里 33s 是等界面渲染，1.2s 的差距被淹没。
+
+**结论：插件值钱的地方是「按文案定位 + 每步看界面再决定下一步」。录制好的死坐标流水线请直接用 `adb_shell` 或一条 `adb_batch`（合并成一次往返），不要逐步调工具。**
+
+> 感谢 @大帅鱼 的独立复测。本轮据此修掉了 4 个问题：`adb_batch` 返回值不是 lossless JSON（导致 3/4 次调用直接报错）、dump 彻底失败时 `adb_tap` 不走视觉兜底、失败时换模式重试导致等待翻倍、`adb_app` 默认等待拖慢启动。详见 [AUDIT.md](AUDIT.md) 第 4 节。
+
 > 文档索引：问题与修复记录 [AUDIT.md](AUDIT.md)｜自检方法与可信度 [docs/VERIFICATION.md](docs/VERIFICATION.md)｜支持的环境 [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md)｜为什么能做到 [docs/WHY-IT-WORKS.md](docs/WHY-IT-WORKS.md)
 
 ---
@@ -114,7 +141,7 @@ adb devices -l                      # 必须看到状态 device
 ### 验证
 
 ```bash
-node scripts/selftest.mjs    # 64 项断言（装进 dsh 后另跑 16 项工具层断言，共 80）
+node scripts/selftest.mjs    # 71 项断言（装进 dsh 后另跑 21 项工具层断言，共 92）
 node scripts/bench.mjs       # 优化前后单步耗时对比
 ```
 
@@ -243,6 +270,11 @@ dsh-quick-adb/
 | `actionTimeoutMs` | `20000` | 动作脚本（含 sleep+dump）超时 |
 | `waitTimeoutMs` | `10000` | `adb_wait` 默认超时 |
 | `settleFastMs` / `settleMediumMs` / `settleSlowMs` | `250` / `700` / `1500` | 动作后到重新解析之间的等待 |
+| `appSettle` | `none` | `adb_app` 默认等待；`none` 只启动不取界面（实测启动慢 61% 的主因） |
+| `keyDelayMs` | `80` | 连按按键间隔（原 200ms 让「返回两次」多花约 140ms） |
+| `inputFocusDelayMs` | `80` | 点击输入框后到开始输入的等待 |
+| `skipDumpMs` | `60000` | 判定「该界面不可 dump」后跳过重复尝试的时长 |
+| `skipDumpPatterns` | 空 | 直接跳过 dump 的包名/Activity 正则，逗号分隔（如 `tv.danmaku.bili`） |
 | `stepDelayMs` | `120` | 批处理中相邻盲动作间隔 |
 | `waitProbeFirst` | `true` | 等待时先用轻探测判断界面切换 |
 | `probeFirstMaxMs` | `1500` | 轻探测优先阶段上限 |
@@ -319,7 +351,7 @@ node scripts/bench.mjs --real --serial 192.168.1.20:5555 --x 540 --y 1200 --step
 ## 11. 测试
 
 ```bash
-node scripts/selftest.mjs     # 64 项（无 dsh 依赖）；装进 dsh 后多跑 16 项工具层断言，共 80 项
+node scripts/selftest.mjs     # 71 项（无 dsh 依赖）；装进 dsh 后多跑 21 项工具层断言，共 92 项
 node scripts/bench.mjs        # 单步耗时对比（mock 或 --real）
 ```
 

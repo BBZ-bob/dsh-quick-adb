@@ -45,6 +45,28 @@ function makeEngine({ fake, config = {} } = {}) {
     return { engine, adb, timing, cache, tmp, fake: f };
 }
 
+/** dsh 会校验工具返回值是 lossless JSON；含 undefined/NaN 都会被拒。 */
+function isLossless(value) {
+    const clone = JSON.parse(JSON.stringify(value));
+    const eq = (a, b) => {
+        if (a === b)
+            return true;
+        if (typeof a !== typeof b || a === null || b === null || typeof a !== 'object')
+            return false;
+        if (Array.isArray(a) || Array.isArray(b)) {
+            if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length)
+                return false;
+            return a.every((item, index) => eq(item, b[index]));
+        }
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length)
+            return false;
+        return keysA.every(key => eq(a[key], b[key]));
+    };
+    return eq(value, clone);
+}
+
 const checks = [];
 function check(name, condition, detail = '') {
     checks.push({ name, ok: condition === true, detail });
@@ -256,7 +278,7 @@ console.log('\n=== 11. 等待：命中与超时上界 ===');
     rmSync(slow.tmp, { recursive: true, force: true });
 }
 
-console.log('\n=== 12. dump 降级链 ===');
+console.log('\n=== 12. dump 降级链与快速失败 ===');
 {
     const unsupported = makeEngine({ fake: makeFake({ faults: { unsupportedCompressed: 1 } }) });
     const result = await unsupported.engine.screen();
@@ -264,10 +286,14 @@ console.log('\n=== 12. dump 降级链 ===');
     check('能力位被永久关闭', unsupported.engine.caps.compressed === false);
     rmSync(unsupported.tmp, { recursive: true, force: true });
 
+    // 超时属于「与压缩模式无关」的失败：换 plain 重试只会再等一遍（P2 实测等待翻倍）
     const timeout = makeEngine({ fake: makeFake({ faults: { dumpErrors: 1 } }) });
-    const recovered = await timeout.engine.screen();
-    check('一次超时后仍成功', recovered.source === 'dump');
+    const before = timeout.fake.state.calls;
+    const timedOut = await timeout.engine.screen();
+    check('超时后立刻转视觉而不是重试第二次', timedOut.source === 'vision');
+    check('只尝试了一次 dump', timeout.fake.state.calls - before <= 3, `calls=${timeout.fake.state.calls - before}`);
     check('超时不会永久关闭压缩（P2-3）', timeout.engine.caps.compressed === true);
+    check('失败被记入不可解析名单', timeout.engine.perception.dumpFailure !== null);
     rmSync(timeout.tmp, { recursive: true, force: true });
 
     const empty = makeEngine({ fake: makeFake({ faults: { emptyDumps: 1 } }) });
@@ -275,16 +301,31 @@ console.log('\n=== 12. dump 降级链 ===');
     check('空层级会重试为普通 dump', afterEmpty.source === 'dump' && afterEmpty.nodes > 0);
     rmSync(empty.tmp, { recursive: true, force: true });
 
+    // 两次都空：screen 不再抛给模型，而是直接给截图兜底（报告第 2 条改进）
     const broken = makeEngine({ fake: makeFake({ faults: { emptyDumps: 2 } }) });
-    let dumpError = '';
-    try {
-        await broken.engine.screen();
-    }
-    catch (error) {
-        dumpError = error.message;
-    }
-    check('两次都失败时报 dump-failed', dumpError.includes('控件树不可用'), dumpError.slice(0, 30));
+    const fallback = await broken.engine.screen();
+    check('两次失败后 screen 返回视觉兜底', fallback.source === 'vision');
+    check('兜底结果带截图路径', typeof fallback.screenshot === 'string' && fallback.screenshot.endsWith('.png'), fallback.screenshot ?? '');
+    check('兜底文案解释原因', fallback.text.includes('无法解析控件树'));
     rmSync(broken.tmp, { recursive: true, force: true });
+
+    // 名单生效：第二次访问同一界面不再付 dump 的钱
+    const memory = makeEngine({ fake: makeFake({ faults: { emptyDumps: 2 } }) });
+    await memory.engine.screen();
+    const dumpCallsBefore = memory.fake.state.scripts.filter(x => x.includes('uiautomator dump')).length;
+    const second = await memory.engine.screen({ invalidate: true });
+    const dumpCallsAfter = memory.fake.state.scripts.filter(x => x.includes('uiautomator dump')).length;
+    check('同界面第二次跳过 dump', dumpCallsAfter === dumpCallsBefore, `dump 次数 ${dumpCallsBefore} → ${dumpCallsAfter}`);
+    check('跳过时仍给出兜底', second.source === 'vision');
+    rmSync(memory.tmp, { recursive: true, force: true });
+
+    // 换应用后应重新尝试 dump，而不是一直跳过
+    const switched = makeEngine({ fake: makeFake({ faults: { emptyDumps: 2 } }) });
+    await switched.engine.screen();
+    switched.fake.state.screen = 'search';
+    const retried = await switched.engine.screen({ invalidate: true });
+    check('换界面后重新尝试 dump', retried.source === 'dump', retried.source);
+    rmSync(switched.tmp, { recursive: true, force: true });
 }
 
 console.log('\n=== 13. 视觉兜底：截图与外部命令 ===');
@@ -386,7 +427,13 @@ console.log('\n=== 15. 工具层：注册、执行、渲染（需 @deepseek-ai/d
 
         const key = await run('adb_key', { key: 'back', times: 2 });
         check('adb_key 连按只发一组命令', key.value.code === 4 && key.value.times === 2);
+        const keyScript = key.made.fake.state.scripts.at(-1) ?? '';
+        check('连按间隔已降到 80ms（原 200ms）', keyScript.includes('sleep 0.08') && !keyScript.includes('sleep 0.20'), keyScript.slice(0, 80));
         rmSync(key.made.tmp, { recursive: true, force: true });
+
+        const appStart = await run('adb_app', { action: 'start', package: 'com.example.app' });
+        check('adb_app 默认 settle=none（不再替调用方感知）', appStart.value.settle === 'none', appStart.value.settle);
+        rmSync(appStart.made.tmp, { recursive: true, force: true });
 
         const waitTool = await run('adb_wait', { selector: { text: '通讯录' }, timeoutMs: 2000 });
         check('adb_wait 返回命中坐标', waitTool.value.ok === true && waitTool.value.point !== null);
@@ -402,6 +449,15 @@ console.log('\n=== 15. 工具层：注册、执行、渲染（需 @deepseek-ai/d
         check('adb_batch 合并为 1 次往返', batchValue.adbCalls === 1 && batchValue.ok === true, `calls=${batchValue.adbCalls}`);
         const batchRendered = batchTool.output.render({}, batchValue)[0].text;
         check('adb_batch 渲染包含步骤序列', /步骤：1✓ 2✓/.test(batchRendered), batchRendered.split('\n')[1] ?? '');
+        check('adb_batch 返回值是 lossless JSON', isLossless(batchValue));
+
+        // P2 现场失败组合：swipe + key + selector tap（4 次测试 3 次报 not lossless JSON）
+        const comboMade = makeEngine();
+        await comboMade.engine.screen();
+        const combo = await comboMade.engine.batch({ steps: [{ swipe: 'up' }, { key: 'back' }, { tap: '搜索' }] });
+        check('swipe+key+selector 组合可执行', combo.ok === true, combo.error ?? '');
+        check('该组合返回值是 lossless JSON', isLossless(combo));
+        rmSync(comboMade.tmp, { recursive: true, force: true });
         rmSync(batchMade.tmp, { recursive: true, force: true });
 
         const app = await run('adb_app', { action: 'current' });

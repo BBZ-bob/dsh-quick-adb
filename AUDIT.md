@@ -2,9 +2,9 @@
 
 - 审计对象：`dsh-quick-adb@0.2.0`（原 `dsh-android-adb@0.1.0`）
 - 审计时间：2026-11-01
-- 状态：**27 项全部关闭**（25 项修复 + 2 项按设计保留并文档化）
+- 状态：**33 项全部关闭**（31 项修复 + 2 项按设计保留并文档化）
 - 自检方法与可信度：见 [docs/VERIFICATION.md](docs/VERIFICATION.md)
-- 回归入口：`node scripts/selftest.mjs`（64 项；装进 dsh 后 80 项）
+- 回归入口：`node scripts/selftest.mjs`（71 项；装进 dsh 后 92 项）
 
 > **口径更正**：上一版汇总写「P2 × 10、P3 × 8」，与实际条目数（各 11 条）不符，本版按实际条目计。
 
@@ -66,10 +66,41 @@
 ## 4. 复现方式
 
 ```bash
-node scripts/selftest.mjs                     # 64 项，无需真机与 dsh
+node scripts/selftest.mjs                     # 71 项，无需真机与 dsh
 DSH_ADB_SELFTEST_VERBOSE=1 node scripts/selftest.mjs   # 额外打印计时表
 node scripts/bench.mjs --steps 5              # 单步耗时对比
 node scripts/bench.mjs --real --serial <id>   # 真机 A/B
 ```
 
 `scripts/mock-device.mjs` 支持故障注入（`faults: { unsupportedCompressed, emptyDumps, dumpErrors, badPng, probePkg }`），原审计指出「错误分支零覆盖」已由这些注入点补齐。
+
+---
+
+## 4. 第三方真机复测发现的问题（2026-11-01，R1–R6）
+
+独立复测（阿里云 Debian + 荣耀平板 Android 16 + easytier，RTT 125ms）在真实链路上暴露了 6 个 mock 测不出来的问题。报告见 `dsh-quick-adb基准报告-含流水线复测.md`。
+
+| ID | 严重度 | 问题 | 证据 | 修复 | 回归 |
+|---|---|---|---|---|---|
+| R1 | **严重（功能不可用）** | `adb_batch` 返回值含 `point: undefined`，被 dsh 判为 `value is not lossless JSON`，4 次测试 3 次失败 | 报告 5.3-5 | 改成按需挂载字段，不再写 `undefined` | §15「lossless JSON」×2 |
+| R2 | **严重（兜底断裂）** | dump 彻底失败时 `resolveWithFallback` 直接抛错，`adb_tap` 不走视觉兜底 | B 站播放页 | catch dump 错误后直接降视觉；`adb_screen` 也改为返回截图兜底而不是抛错 | §12 |
+| R3 | 中 | dump 失败后换模式重试，等待翻倍（2×2.4s） | 报告第 2 条建议 | 区分「与压缩模式无关的失败」（idle 卡死/超时）不再重试；失败后记住该界面并在 `skipDumpMs` 内跳过 | §12 |
+| R4 | 中 | `adb_app` 默认 `settle=medium`，启动比裸 adb 慢 61%（656→1054ms） | 报告 7.4 | 新增 `appSettle`，默认 `none`：启动就是启动，需要界面再传 settle | §15 |
+| R5 | 中 | 连按按键间隔固定 200ms，返回两次多花 ~140ms | 报告 7.4（328→468ms） | 新增 `keyDelayMs`，默认 80ms | §15 |
+| R6 | 低 | `adb_screen` 在不可解析界面直接抛错，模型拿不到任何可用信息 | 报告第 2 条建议 | 改为返回 `source=vision` + 截图路径 + 原因 | §12 |
+
+### 对「用 `exec-out uiautomator dump /dev/tty`」建议的回应
+
+建议本身对（少两次往返），但**本插件已经是更优形态**：dump 与 cat 在同一条 shell 内完成，一次 ADB 调用。第三方的两组实测正好印证：
+
+| 路径 | 实测 |
+|---|---:|
+| 拉文件式（dump / pull / rm） | 3486 ms |
+| `exec-out uiautomator dump /dev/tty` | 2664 ms |
+| 本插件（`dump; cat` 单次往返） | **2431–2506 ms** |
+
+因此没有改成 `/dev/tty`：它在部分 ROM 上会把状态行混进 stdout，稳定性不如落盘+cat，而耗时已经更低。
+
+### 结论修正
+
+README 原文用 mock 数据宣称「单步 ~0.8s、5 步 4.2s」，在真实链路（dump 2.4s）下不成立。已在 README 第 0 节按实测重写，并明确：**插件只在「需要感知」的流程里划算；固定坐标流水线逐步调用工具是负优化（+32%）。**
