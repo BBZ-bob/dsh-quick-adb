@@ -38,6 +38,24 @@
 
 **结论：插件值钱的地方是「按文案定位 + 每步看界面再决定下一步」。录制好的死坐标流水线请直接用 `adb_shell` 或一条 `adb_batch`（合并成一次往返），不要逐步调工具。**
 
+### P3e：0.2.5 达标（比裸 adb 快 19.8%）与随后的三处打磨
+
+0.2.5 实测（同流程 3 轮）：**合计 7405ms vs 裸 adb 9232ms（−19.8%）**，「定位并点设置」5409 → **3054ms**。三种 confirm 状态的探针：
+
+| 模式 | 实测 | 说明 |
+|---|---:|---|
+| `confirm:auto`（默认） | 3106 / 2832ms | 本机 dump 慢 → 自动不确认，等价最优 |
+| `confirm:true` | 5584 / 5595ms | 强制确认，多一整遍 dump |
+| `confirm:false` | 3214 / 3170ms | 只等待不解析 |
+
+0.2.6 的打磨（对应复测提的三点）：
+
+1. **纯动作回退已修**：auto 判定“不做确认”时，若调用方也没显式要求等待，就**一并省掉那段 250ms sleep**。此前 home 197→234、back 162→296 的差值正好是这次多余等待。
+2. **设备画像按 serial 落盘**（`<dsh-home>/quick-adb/devices.json`）：dump 成本与模式重启后直接复用，不必重新估。
+3. **`adb_timing` 表头直接给结论**：`设备 dump ≈ 2640ms（serial …，模式 plain）｜dump 偏慢：保持 confirm=auto`，一眼看出这台机器值不值得开确认。
+
+启动类动作仍是唯一略慢于基线的项（550 vs 480ms）：`appSettle` 默认已是 `none`，这点差值来自 Node 封装 + 一次 adb 进程启动，不是可省的 dump。
+
 ### P3c：0.2.3 复测——compressed 修对了，但真瓶颈是「一次点击两次 dump」
 
 | 步骤 | 基线 | 0.2.0 | 0.2.3 |
@@ -181,7 +199,7 @@ adb devices -l                      # 必须看到状态 device
 ### 验证
 
 ```bash
-node scripts/selftest.mjs    # 89 项断言（装进 dsh 后另跑 21 项工具层断言，共 110）
+node scripts/selftest.mjs    # 94 项断言（装进 dsh 后另跑 21 项工具层断言，共 115）
 node scripts/bench.mjs       # 优化前后单步耗时对比
 ```
 
@@ -394,7 +412,7 @@ node scripts/bench.mjs --real --serial 192.168.1.20:5555 --x 540 --y 1200 --step
 ## 11. 测试
 
 ```bash
-node scripts/selftest.mjs     # 89 项（无 dsh 依赖）；装进 dsh 后多跑 21 项工具层断言，共 110 项
+node scripts/selftest.mjs     # 94 项（无 dsh 依赖）；装进 dsh 后多跑 21 项工具层断言，共 115 项
 node scripts/bench.mjs        # 单步耗时对比（mock 或 --real）
 ```
 

@@ -373,7 +373,7 @@ console.log('\n=== 12d. 单 dump 模式（P3c：慢 dump 设备不做确认 dump
     const after = slow.fake.state.scripts.filter(x => x.includes('uiautomator dump')).length;
     check('动作默认跳过确认 dump（0 次新 dump）', after === before, `dump ${before} → ${after}`);
     check('标记 autoSettle=single-dump', result.autoSettle === 'single-dump');
-    check('返回 note 提示下一步感知', result.note.includes('跳过点击后确认'));
+    check('返回 note 提示下一步感知', result.note.includes('已自动跳过确认 dump'));
     // P3d 现场脚本传的就是 settle:'fast'——现在它只控制等待，不再强制确认 dump
     const forced = await slow.engine.tap({ x: 540, y: 1200, settle: 'fast' });
     check('显式 settle 只控制等待（慢设备不做确认）', forced.settle === 'none' && forced.autoSettle === 'single-dump', forced.settle);
@@ -393,6 +393,39 @@ console.log('\n=== 12d. 单 dump 模式（P3c：慢 dump 设备不做确认 dump
     const fastResult = await fast.engine.tap({ selector: { text: '搜索' } });
     check('快设备不受影响，仍做事后确认', fastResult.settle === 'dumped' && fastResult.autoSettle === undefined, fastResult.settle);
     rmSync(fast.tmp, { recursive: true, force: true });
+}
+
+console.log('\n=== 12e. 设备画像持久化 + 纯动作不再多睡 ===');
+{
+    const file = join(tmpdir(), `qadb-device-${Date.now()}.json`);
+    const first = makeEngine({ fake: makeFake({ dumpMs: 1800 }), config: { deviceCacheFile: file } });
+    await first.engine.screen();
+    await new Promise(done => setTimeout(done, 400));
+    const stored = JSON.parse(readFileSync(file, 'utf8'));
+    check('dump 成本已按 serial 落盘', stored['fake-serial-1']?.dumpCostMs >= 1500, JSON.stringify(stored['fake-serial-1']));
+
+    const second = makeEngine({ fake: makeFake({ dumpMs: 1800 }), config: { deviceCacheFile: file } });
+    await second.engine.device();
+    await second.engine.perception.applyDeviceProfile('fake-serial-1');
+    check('重启后无需 dump 就知道本机成本', second.engine.perception.slowDumpDevice() === true, `cost=${second.engine.perception.dumpCostMs}ms`);
+
+    // 纯动作：慢设备默认既不 dump 也不额外睡 settle
+    const keyEngine = makeEngine({ fake: makeFake({ dumpMs: 1800 }) });
+    await keyEngine.engine.screen();
+    await keyEngine.engine.key({ key: 'back', times: 2 });
+    const keyScript = keyEngine.fake.state.scripts.at(-1) ?? '';
+    check('慢设备纯按键不含确认 dump', !keyScript.includes('uiautomator'), keyScript.slice(0, 60));
+    check('慢设备纯按键不含 settle 等待（只保留键间 80ms）', !keyScript.includes('sleep 0.25'), keyScript.slice(0, 60));
+
+    // 显式要求等待时仍然等待（只是不 dump）
+    await keyEngine.engine.key({ key: 'back', times: 1, settle: 'fast' });
+    const waitScript = keyEngine.fake.state.scripts.at(-1) ?? '';
+    check('显式 settle 在慢设备上仍会等待但不 dump', waitScript.includes('sleep 0.25') && !waitScript.includes('uiautomator'), waitScript.slice(0, 60));
+
+    rmSync(first.tmp, { recursive: true, force: true });
+    rmSync(second.tmp, { recursive: true, force: true });
+    rmSync(keyEngine.tmp, { recursive: true, force: true });
+    rmSync(file, { force: true });
 }
 
 console.log('\n=== 13. 视觉兜底：截图与外部命令 ===');
