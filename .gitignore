@@ -2,3 +2,7 @@ node_modules/
 *.log
 .DS_Store
 coverage/
+
+# 本地复测原始报告（含设备地址等现场信息，不入库）
+reports/*
+!reports/README.md
