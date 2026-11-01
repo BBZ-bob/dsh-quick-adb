@@ -54,7 +54,7 @@
 2. **设备画像按 serial 落盘**（`<dsh-home>/quick-adb/devices.json`）：dump 成本与模式重启后直接复用，不必重新估。
 3. **`adb_timing` 表头直接给结论**：`设备 dump ≈ 2640ms（serial …，模式 plain）｜dump 偏慢：保持 confirm=auto`，一眼看出这台机器值不值得开确认。
 
-另修一处表头字段名错误：`clickables` 写成了复数，引擎读的是单数，导致界面摘要第一行永远显示「可点击=0」而下面却列着 5 个目标（P3f 现场发现）。现在表头数字与清单严格一致。
+另修一处表头字段名错误：`clickables` 写成了复数，引擎读的是单数，导致界面摘要第一行永远显示「可点击=0」而下面却列着 N 个目标（P3f 现场发现）。同时统一了计数口径——节点级计数改名 `clickableNodes` 仅作诊断，所有对外展示一律用 `目标=N`（严格等于清单条数），不再出现两个数字打架。
 
 启动类动作仍是唯一略慢于基线的项（550 vs 480ms）：`appSettle` 默认已是 `none`，这点差值来自 Node 封装 + 一次 adb 进程启动，不是可省的 dump。
 
@@ -201,7 +201,7 @@ adb devices -l                      # 必须看到状态 device
 ### 验证
 
 ```bash
-node scripts/selftest.mjs    # 94 项断言（装进 dsh 后另跑 22 项工具层断言，共 116）
+node scripts/selftest.mjs    # 95 项断言（装进 dsh 后另跑 22 项工具层断言，共 117）
 node scripts/bench.mjs       # 优化前后单步耗时对比
 ```
 
@@ -414,7 +414,7 @@ node scripts/bench.mjs --real --serial 192.168.1.20:5555 --x 540 --y 1200 --step
 ## 11. 测试
 
 ```bash
-node scripts/selftest.mjs     # 94 项（无 dsh 依赖）；装进 dsh 后多跑 22 项工具层断言，共 116 项
+node scripts/selftest.mjs     # 95 项（无 dsh 依赖）；装进 dsh 后多跑 22 项工具层断言，共 117 项
 node scripts/bench.mjs        # 单步耗时对比（mock 或 --real）
 ```
 

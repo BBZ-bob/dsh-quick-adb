@@ -82,6 +82,7 @@ console.log('\n=== 1. 控件树解析（无 ADB） ===');
 {
     const tree = buildTree(fixtures.home);
     check('解析出节点', tree.nodes.length >= 10, `nodes=${tree.nodes.length}`);
+    check('节点级可点击计数独立存在', tree.clickableNodes > 0, `clickableNodes=${tree.clickableNodes}`);
     check('提取包名', tree.pkg === 'com.tencent.mm', tree.pkg);
     check('计算界面签名', /^[0-9a-f]{8}$/.test(tree.signature), tree.signature);
     const row = tree.nodes.find(node => node.text === '文件传输助手');
@@ -501,8 +502,8 @@ console.log('\n=== 15. 工具层：注册、执行、渲染（需 @deepseek-ai/d
         const screen = await run('adb_screen', { selector: { text: '搜索' } });
         check('adb_screen 返回目标与定位', screen.value.targetCount > 0 && screen.value.find?.ok === true, JSON.stringify(screen.value.find?.point));
         const header = screen.value.text.split('\n')[0];
-        const headerCount = Number(/可点击=(\d+)/.exec(header)?.[1] ?? -1);
-        check('表头「可点击」数与清单一致（P3f 回归）', headerCount === screen.value.targetCount, `${header} | targetCount=${screen.value.targetCount}`);
+        const headerCount = Number(/目标=(\d+)/.exec(header)?.[1] ?? -1);
+        check('表头目标数与清单一致（P3f 回归）', headerCount === screen.value.targetCount, `${header} | targetCount=${screen.value.targetCount}`);
         const rendered = names.get('adb_screen').output.render({}, screen.value)[0].text;
         check('adb_screen 渲染文本包含命中坐标（P1-3 回归）', rendered.includes('定位命中') && rendered.includes('(900,160)'), rendered.split('\n').pop());
         rmSync(screen.made.tmp, { recursive: true, force: true });
