@@ -76,9 +76,9 @@ node scripts/bench.mjs --real --serial <id>   # 真机 A/B
 
 ---
 
-## 4. 第三方真机复测发现的问题（2026-11-01，R1–R6）
+## 4. 实机复测发现的问题（2026-11-01，R1–R6）
 
-独立复测（阿里云 Debian + 荣耀平板 Android 16 + easytier，RTT 125ms）在真实链路上暴露了 6 个 mock 测不出来的问题。报告见 `dsh-quick-adb基准报告-含流水线复测.md`。
+使用者部署在云端的 dsh 实例（阿里云 Debian + 荣耀平板 Android 16 + easytier，RTT 125ms）经 QQ 通道驱动复测，在真实链路上暴露了 6 个 mock 测不出来的问题。注意这是**被测系统自测**——测量与执行是同一个 agent，存在自报口径偏差（见 VERIFICATION 局限）。
 
 | ID | 严重度 | 问题 | 证据 | 修复 | 回归 |
 |---|---|---|---|---|---|
@@ -105,7 +105,7 @@ node scripts/bench.mjs --real --serial <id>   # 真机 A/B
 
 ### 对「用 `exec-out uiautomator dump /dev/tty`」建议的回应
 
-建议本身对（少两次往返），但**本插件已经是更优形态**：dump 与 cat 在同一条 shell 内完成，一次 ADB 调用。第三方的两组实测正好印证：
+建议本身对（少两次往返），但**本插件已经是更优形态**：dump 与 cat 在同一条 shell 内完成，一次 ADB 调用。复测里的两组数据正好印证：
 
 | 路径 | 实测 |
 |---|---:|

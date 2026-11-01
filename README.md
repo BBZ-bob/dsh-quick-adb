@@ -13,7 +13,7 @@
 
 单步加速 **≈5.1×**（多次运行 5.05–5.10；表内为单次示例，数值随调度略有波动）。自测（`node scripts/selftest.mjs`）里，9 个真实场景综合下来是 **0.38 次往返/步**，对照实测的「朴素三步式」是 **3 次/步**。
 
-## 0. 真实链路实测（第三方，2026-11-01）
+## 0. 真实链路实测（2026-11-01，由部署在云端的 dsh 自身经 QQ 通道复测）
 
 上面的数字来自 mock 设备（dump 520ms）。真实链路上 dump 本身就要 2.4–2.5s，所以**单步是 3 秒量级，不是 0.8 秒**。下面是独立复测（阿里云 Debian + 荣耀平板 Android 16 + easytier 组网，RTT 125ms）的关键结论：
 
@@ -98,7 +98,7 @@ compressed 自动探测生效了（其余步骤全面转好），但定位点按
 
 > **0.2.2 补记**：现场复测 `swipe → swipe → dump` 三步是 2 次往返 6434ms，其中第二次是收尾重复 dump（末尾已有 `{dump:true}`，`verify` 又补了一次）。0.2.2 起收尾只在「上次 dump 后仍动过界面」时才补，同一流程变为 **1 次往返**（该链路上约省 3.2s）。因此批量里**不需要**在末尾再写 `{dump:true}`。
 >
-> 感谢 @大帅鱼 的独立复测。本轮据此修掉了 4 个问题：`adb_batch` 返回值不是 lossless JSON（导致 3/4 次调用直接报错）、dump 彻底失败时 `adb_tap` 不走视觉兜底、失败时换模式重试导致等待翻倍、`adb_app` 默认等待拖慢启动。详见 [AUDIT.md](AUDIT.md) 第 4 节。
+> 本节数据来自使用者部署在云端的 dsh 实例（经 QQ 对话驱动，设备为荣耀平板）。本轮据此修掉了 4 个问题：`adb_batch` 返回值不是 lossless JSON（导致 3/4 次调用直接报错）、dump 彻底失败时 `adb_tap` 不走视觉兜底、失败时换模式重试导致等待翻倍、`adb_app` 默认等待拖慢启动。详见 [AUDIT.md](AUDIT.md) 第 4 节。
 
 > 文档索引：问题与修复记录 [AUDIT.md](AUDIT.md)｜自检方法与可信度 [docs/VERIFICATION.md](docs/VERIFICATION.md)｜支持的环境 [docs/ENVIRONMENTS.md](docs/ENVIRONMENTS.md)｜为什么能做到 [docs/WHY-IT-WORKS.md](docs/WHY-IT-WORKS.md)
 
