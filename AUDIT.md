@@ -2,9 +2,9 @@
 
 - 审计对象：`dsh-quick-adb@0.2.0`（原 `dsh-android-adb@0.1.0`）
 - 审计时间：2026-11-01
-- 状态：**45 项全部关闭**（43 项修复 + 2 项按设计保留并文档化）
+- 状态：**46 项全部关闭**（44 项修复 + 2 项按设计保留并文档化）
 - 自检方法与可信度：见 [docs/VERIFICATION.md](docs/VERIFICATION.md)
-- 回归入口：`node scripts/selftest.mjs`（94 项；装进 dsh 后 115 项）
+- 回归入口：`node scripts/selftest.mjs`（94 项；装进 dsh 后 116 项）
 
 > **口径更正**：上一版汇总写「P2 × 10、P3 × 8」，与实际条目数（各 11 条）不符，本版按实际条目计。
 
@@ -100,6 +100,7 @@ node scripts/bench.mjs --real --serial <id>   # 真机 A/B
 | R16 | 中 | auto 只跳过确认 dump、仍保留 250ms 等待，纯动作比 0.2.4 回退 | P3e：home 197→234、back 162→296 | 未显式指定 settle 时，跳过确认即同时跳过等待 | §12e |
 | R17 | 中 | dump 成本只存在内存，重启后第一枪又按“快设备”处理 | P3e 建议 2 | 设备画像按 serial 落盘（`devices.json`），启动即读 | §12e |
 | R18 | 低 | `adb_timing` 看不出这台设备是否值得开 confirm | P3e 建议 4 | 表头输出 `设备 dump ≈ Xms` + 建议 | §15 |
+| R19 | 中 | `buildTree` 写的是 `clickables`（复数），引擎读 `tree.clickable`（单数）→ 界面表头永远显示「可点击=0」，而下面却列出 N 个目标 | P3f 现场：`节点=38 可点击=0` 后跟 5 个可点击项 | 字段改名为 `clickable`；表头改用「去重后实际列出的目标数」，与清单严格一致 | §15 |
 
 ### 对「用 `exec-out uiautomator dump /dev/tty`」建议的回应
 

@@ -500,6 +500,9 @@ console.log('\n=== 15. 工具层：注册、执行、渲染（需 @deepseek-ai/d
 
         const screen = await run('adb_screen', { selector: { text: '搜索' } });
         check('adb_screen 返回目标与定位', screen.value.targetCount > 0 && screen.value.find?.ok === true, JSON.stringify(screen.value.find?.point));
+        const header = screen.value.text.split('\n')[0];
+        const headerCount = Number(/可点击=(\d+)/.exec(header)?.[1] ?? -1);
+        check('表头「可点击」数与清单一致（P3f 回归）', headerCount === screen.value.targetCount, `${header} | targetCount=${screen.value.targetCount}`);
         const rendered = names.get('adb_screen').output.render({}, screen.value)[0].text;
         check('adb_screen 渲染文本包含命中坐标（P1-3 回归）', rendered.includes('定位命中') && rendered.includes('(900,160)'), rendered.split('\n').pop());
         rmSync(screen.made.tmp, { recursive: true, force: true });
